@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Jarvis">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#05030f">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<title>Jarvis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
+<style>
+:root{
+  color-scheme:dark;
+  --wine-deep:#05030f; --wine:#120a30; --wine-mid:#2a1352;
+  --gold:#e6b84f; --gold-hi:#ffe2a0; --sky:#a9d4ff; --rose:#ff9db8; --ink:#ffffff; --muted:#e9e9ec;
+  --serif:"Fraunces",Georgia,"Times New Roman",serif;
+  --sans:"DM Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  box-sizing:border-box;
+}
+*,*::before,*::after{box-sizing:inherit}
+html,body{height:100%;margin:0;overflow:hidden}
+body{
+  font-family:var(--sans);color:var(--ink);
+  background:
+    radial-gradient(55% 42% at 50% 42%,rgba(255,150,40,.20),transparent 72%),
+    radial-gradient(95% 70% at 50% 40%,var(--wine-mid) 0%,var(--wine) 50%,var(--wine-deep) 100%);
+  padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);
+  display:flex;flex-direction:column;
+}
+header{display:flex;justify-content:space-between;align-items:baseline;padding:26px 28px 0}
+h1{margin:0;font:600 1.7rem var(--serif);letter-spacing:.01em;
+  color:#fff}
+#clock{font:500 .95rem var(--sans);color:var(--muted);text-align:right}
+#status{text-align:center;font-size:1rem;color:#fff;min-height:1.5em;margin-top:18px;transition:color .3s}
+#status.on{color:#fff;text-shadow:0 0 12px rgba(230,184,79,.55)}
+main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:0;gap:6px}
+#orb{
+  position:relative;width:min(96vw,48vh,480px);aspect-ratio:1;border:0;padding:0;border-radius:50%;background:radial-gradient(circle,rgba(255,176,80,calc(.3 + var(--l,0) * .55)) 0%,rgba(255,120,30,calc(.09 + var(--l,0) * .14)) 38%,rgba(255,120,30,0) 68%);
+  cursor:pointer;-webkit-tap-highlight-color:transparent;
+}
+#orb:focus-visible{outline:3px solid var(--gold);outline-offset:-12px}
+#orb[disabled]{cursor:default}
+canvas{width:100%;height:100%;display:block}
+#orb svg{position:absolute;left:50%;top:50%;width:11%;height:11%;transform:translate(-50%,-50%);pointer-events:none;color:#fff;opacity:.9;transition:opacity .2s}
+#orb .stop{opacity:0}
+#orb.rec .mic{opacity:0}
+#orb.rec .stop{opacity:1;color:#fff}
+#panel{
+  width:min(92vw,540px);min-height:72px;max-height:21vh;overflow-y:auto;margin:0 0 6px;
+  padding:16px 20px;border-radius:22px;
+  background:linear-gradient(135deg,rgba(230,184,79,.12),rgba(230,184,79,.03));
+  border:1px solid rgba(230,184,79,.4);
+  font-size:1.1rem;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+}
+#panel.hint{color:var(--muted);border-color:rgba(255,255,255,.1)}
+#panel.err{color:#ffc9c9;border-color:rgba(255,120,120,.55);background:rgba(255,90,90,.1)}
+footer{display:flex;flex-wrap:wrap;justify-content:center;gap:6px 24px;padding:4px 16px 24px}
+footer button{background:none;border:0;color:var(--muted);font:500 .9rem var(--sans);padding:10px;cursor:pointer;text-decoration:underline;text-underline-offset:4px}
+footer button:hover,footer button:focus-visible{color:var(--gold-hi);outline:0}
+#gate{position:fixed;inset:0;z-index:5;background:linear-gradient(var(--wine),var(--wine-deep));display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:30px;text-align:center}
+#gate h2{margin:0;font:600 1.8rem var(--serif)}
+#gate p{margin:0;color:var(--muted);line-height:1.5;max-width:30ch}
+#gate input{width:min(86vw,340px);font:500 1.1rem var(--sans);text-align:center;padding:15px;color:var(--ink);background:rgba(255,255,255,.07);border:1px solid rgba(230,184,79,.45);border-radius:14px}
+#gate input:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+#gate button{font:600 1rem var(--sans);padding:15px 38px;color:var(--wine-deep);background:linear-gradient(135deg,var(--gold-hi),var(--gold));border:0;border-radius:14px;cursor:pointer;box-shadow:0 0 22px rgba(230,184,79,.4)}
+ #heard{width:min(92vw,540px);color:var(--muted);font-size:.9rem;padding:0 8px}
+#heard:empty{display:none}
+#sheet{position:fixed;inset:0;z-index:6;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;padding:20px}
+#sheet .card{width:min(94vw,440px);max-height:92vh;overflow:auto;background:linear-gradient(160deg,#1d1240,#07041a);border:1px solid rgba(230,184,79,.4);border-radius:22px;padding:22px;display:flex;flex-direction:column;gap:18px}
+#sheet h2{margin:0;font:600 1.5rem var(--serif)}
+.grp span{display:block;margin-bottom:8px}
+.grp small{display:block;margin-top:6px;color:var(--muted);font-size:.85rem;line-height:1.4}
+.seg{display:flex;gap:8px}
+.seg button{flex:1;padding:12px 6px;border-radius:12px;border:1px solid rgba(230,184,79,.35);background:transparent;color:#fff;font:500 .95rem var(--sans);cursor:pointer}
+.seg button[aria-pressed="true"]{background:linear-gradient(135deg,var(--gold-hi),var(--gold));color:#000;border-color:transparent}
+.seg button:focus-visible,#sheetClose:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+#sheetClose{font:600 1rem var(--sans);padding:14px;color:#000;background:linear-gradient(135deg,var(--gold-hi),var(--gold));border:0;border-radius:14px;cursor:pointer}
+.ver{margin:0;text-align:center;color:var(--muted);font-size:.8rem}
+ #gl{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;display:block}
+header,#status,main,footer{position:relative;z-index:1}
+#orb{touch-action:none}
+.gl #orb{background:none}
+.gl #cv{display:none}
+#orb svg{filter:drop-shadow(0 0 6px rgba(90,25,0,.9))}
+#status{text-shadow:0 0 14px rgba(255,170,70,.45)}
+footer button{padding:8px 16px;border:1px solid rgba(255,255,255,.16);border-radius:999px;background:rgba(255,255,255,.06);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);text-decoration:none}
+@media (prefers-reduced-motion:no-preference){ main{animation:in .8s ease-out both} @keyframes in{from{opacity:0;transform:translateY(10px)}} }
+</style>
+</head>
+<body>
+<header>
+  <h1>Jarvis</h1>
+  <div id="clock"><span id="time">--:--</span> · <span id="date"></span></div>
+</header>
+<div id="status" role="status">Jarvis startet …</div>
+
+<main>
+  <button id="orb" type="button" aria-label="Gespräch starten oder beenden">
+    <canvas id="cv"></canvas>
+    <svg class="mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+    <svg class="stop" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2.5"/></svg>
+  </button>
+  <div id="heard"></div>
+  <div id="panel" class="hint" aria-live="polite">Tippe einmal auf das Licht. Danach hört Jarvis von selbst zu: sprich, mach eine kurze Pause und warte auf die Antwort. Zum Beenden tippst du nochmal.</div>
+</main>
+
+<footer>
+  <button id="endbtn" type="button" hidden>Gespräch beenden</button>
+  <button id="retry" type="button" hidden>Erneut senden</button>
+  <button id="replay" type="button" hidden>Nochmal abspielen</button>
+  <button id="settings" type="button">Einstellungen</button>
+</footer>
+
+<div id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetT">
+  <div class="card">
+    <h2 id="sheetT">Einstellungen</h2>
+    <div class="grp"><span>Empfindlichkeit des Mikrofons</span>
+      <div class="seg"><button type="button" data-k="sens" data-v="low">Niedrig</button><button type="button" data-k="sens" data-v="mid">Mittel</button><button type="button" data-k="sens" data-v="high">Hoch</button></div>
+      <small>Hoch, wenn Jarvis dich nicht hört. Niedrig, wenn er auf Geräusche reagiert.</small></div>
+    <div class="grp"><span>Pause, bis Jarvis antwortet</span>
+      <div class="seg"><button type="button" data-k="pause" data-v="short">Kurz</button><button type="button" data-k="pause" data-v="normal">Normal</button><button type="button" data-k="pause" data-v="long">Lang</button></div>
+      <small>Lang, wenn er dir ins Wort fällt.</small></div>
+    <div class="grp"><span>Nach der Antwort weiter zuhören</span>
+      <div class="seg"><button type="button" data-k="auto" data-v="true">Ein</button><button type="button" data-k="auto" data-v="false">Aus</button></div></div>
+    <div class="grp"><span>Bildschirm anlassen</span>
+      <div class="seg"><button type="button" data-k="wake" data-v="true">Ein</button><button type="button" data-k="wake" data-v="false">Aus</button></div></div>
+    <div class="grp"><span>Effekte der Kugel</span>
+      <div class="seg"><button type="button" data-k="fx" data-v="low">Dezent</button><button type="button" data-k="fx" data-v="mid">Normal</button><button type="button" data-k="fx" data-v="high">Maximal</button></div>
+      <small>Maximal ist heller und dichter. Dezent, wenn dein Gerät ruckelt.</small></div>
+    <div class="grp"><span>Soundeffekte</span>
+      <div class="seg"><button type="button" data-k="sound" data-v="true">Ein</button><button type="button" data-k="sound" data-v="false">Aus</button></div></div>
+    <div class="grp"><span>Sprechtempo</span>
+      <div class="seg"><button type="button" data-k="speed" data-v="1">Normal</button><button type="button" data-k="speed" data-v="1.12">Flott</button></div></div>
+    <button id="change" class="link" type="button" style="background:none;border:0;color:var(--muted);text-decoration:underline;font:500 .95rem var(--sans);padding:6px;cursor:pointer">Schlüssel ändern</button>
+    <button id="sheetClose" type="button">Fertig</button>
+    <p class="ver">Version 3.0</p>
+  </div>
+</div>
+
+<form id="gate" onsubmit="return false">
+  <h2>Jarvis</h2>
+  <p id="gateMsg">Gib deinen Schlüssel ein. Er wird nur auf diesem Gerät gespeichert.</p>
+  <input id="key" type="password" autocomplete="off" placeholder="Schlüssel" aria-label="Schlüssel">
+  <button id="save" type="button">Freigeben</button>
+</form>
+
+<script>
+const WEBHOOK = "https://jarvis-marten.app.n8n.cloud/webhook/jarvis";
+const $ = id => document.getElementById(id);
+const RM = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const player = new Audio();
+let key = "", rec = null, chunks = [], stream = null, busy = false;
+let ac = null, an = null, fd = null, srcNode = null, typer = null;
+let anOut = null, fdOut = null, outSrc = null, lastUrl = "";
+let state = "idle";
+
+const LABEL = {
+  idle:"Tippe, dann hört Jarvis zu", rec:"Ich höre zu …",
+  think:"Einen Moment …", speak:"Jarvis antwortet · Tippen unterbricht"
+};
+function setState(s){
+  state = s; $("status").textContent = LABEL[s];
+  $("status").classList.toggle("on", s !== "idle");
+  $("orb").classList.toggle("rec", s === "rec");
+}
+function getKey(){ try { return localStorage.getItem("jarvis-key") || ""; } catch(e){ return ""; } }
+function setKey(v){ try { v ? localStorage.setItem("jarvis-key", v) : localStorage.removeItem("jarvis-key"); } catch(e){} }
+function showGate(on){ $("gate").style.display = on ? "flex" : "none"; $("orb").disabled = on; }
+
+function say(text, cls, instant){
+  clearInterval(typer);
+  const p = $("panel"); p.className = cls || ""; p.textContent = "";
+  if (instant || RM){ p.textContent = text; return; }
+  let i = 0;
+  typer = setInterval(() => {
+    p.textContent = text.slice(0, ++i); p.scrollTop = p.scrollHeight;
+    if (i >= text.length) clearInterval(typer);
+  }, 14);
+}
+function tick(){
+  const d = new Date();
+  $("time").textContent = d.toLocaleTimeString("de-DE", {hour:"2-digit", minute:"2-digit"});
+  $("date").textContent = d.toLocaleDateString("de-DE", {weekday:"long", day:"numeric", month:"long"});
+}
+tick(); setInterval(tick, 10000);
+
+/* ---------- Einstellungen ---------- */
+const IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const SENS = {low:{m:3, min:.035, max:.09}, mid:{m:2.2, min:.025, max:.07}, high:{m:1.6, min:.018, max:.055}};
+const PAUSE = {short:900, normal:1300, long:2000};
+const cfg = {sens:"mid", pause:"normal", auto:true, wake:true, sound:true, speed:"1", fx:"mid"};
+try{ Object.assign(cfg, JSON.parse(localStorage.getItem("jarvis-set") || "{}")); }catch(e){}
+function paintCfg(){
+  document.querySelectorAll("#sheet [data-k]").forEach(b => b.setAttribute("aria-pressed", String(String(cfg[b.dataset.k]) === b.dataset.v)));
+}
+document.querySelectorAll("#sheet [data-k]").forEach(b => b.addEventListener("click", () => {
+  const v = b.dataset.v; cfg[b.dataset.k] = v === "true" ? true : v === "false" ? false : v;
+  try{ localStorage.setItem("jarvis-set", JSON.stringify(cfg)); }catch(e){}
+  paintCfg();
+}));
+
+/* ---------- Audio-Grundlagen ---------- */
+let live = false, sendNext = false, arming = false, speechSeen = false, hinted = false, dragMoved = false, shockT0 = -1e9;
+let speechMs = 0, silenceMs = 0, listenMs = 0, rmsS = 0, noiseFloor = Infinity, lastTick = 0;
+let vadTimer = null, wake = null, td = null, lastBlob = null, unlocked = false;
+
+function ensureAC(){
+  if (!ac){ try{ ac = new (window.AudioContext || window.webkitAudioContext)(); }catch(e){} }
+  if (ac && ac.state === "suspended") return ac.resume().catch(() => {});
+  return Promise.resolve();
+}
+function silentWav(){
+  const n = 800, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+  const w = (o, t) => { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
+  w(0,"RIFF"); v.setUint32(4, 36 + n * 2, true); w(8,"WAVE"); w(12,"fmt "); v.setUint32(16,16,true);
+  v.setUint16(20,1,true); v.setUint16(22,1,true); v.setUint32(24,8000,true); v.setUint32(28,16000,true);
+  v.setUint16(32,2,true); v.setUint16(34,16,true); w(36,"data"); v.setUint32(40,n * 2,true);
+  return URL.createObjectURL(new Blob([buf], {type:"audio/wav"}));
+}
+function unlockAudio(){          /* erlaubt später automatische Wiedergabe (iPhone) */
+  if (unlocked) return; unlocked = true;
+  try{ player.src = silentWav(); player.play().then(() => player.pause()).catch(() => { unlocked = false; }); }catch(e){}
+}
+function hookOut(){              /* Orb folgt der echten Stimme (nicht auf iOS, dort bleibt der normale Player) */
+  try{
+    if (IOS || !ac || ac.state !== "running") return;
+    if (!outSrc){
+      outSrc = ac.createMediaElementSource(player);
+      anOut = ac.createAnalyser(); anOut.fftSize = 256;
+      outSrc.connect(anOut); anOut.connect(ac.destination);
+      fdOut = new Uint8Array(anOut.frequencyBinCount);
+    }
+  }catch(e){ anOut = null; }
+}
+function setAudio(b64){
+  try {
+    let raw = (b64 || "").trim();
+    if (raw.startsWith("data:")) {
+      const comma = raw.indexOf(",");
+      if (comma >= 0) raw = raw.slice(comma + 1);
+    }
+    // strip whitespace/newlines that some backends insert
+    raw = raw.replace(/\s/g, "");
+    const bin = atob(raw);
+    const u8 = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    if (lastUrl) URL.revokeObjectURL(lastUrl);
+    // detect format from magic bytes
+    let mime = "audio/mpeg";
+    if (u8[0] === 0x52 && u8[1] === 0x49) mime = "audio/wav"; // RIFF
+    else if (u8[0] === 0x4F && u8[1] === 0x67) mime = "audio/ogg"; // OggS
+    else if (u8[0] === 0x66 && u8[1] === 0x4C) mime = "audio/flac";
+    lastUrl = URL.createObjectURL(new Blob([u8], {type: mime}));
+    player.src = lastUrl;
+  } catch (err) {
+    console.error("setAudio failed", err);
+    throw new Error("Audio der Antwort konnte nicht gelesen werden.");
+  }
+}
+async function lockScreen(){ try{ if (cfg.wake && navigator.wakeLock) wake = await navigator.wakeLock.request("screen"); }catch(e){} }
+function unlockScreen(){ try{ if (wake) wake.release(); }catch(e){} wake = null; }
+function cue(kind){              /* kurze, leise Signaltöne und ein Vibrationsimpuls */
+  if (!cfg.sound) return;
+  try{
+    if (ac && ac.state === "running"){
+      const t0 = ac.currentTime, o = ac.createOscillator(), gn = ac.createGain();
+      const f = {start:[520, 780], send:[780, 520], reply:[392, 588]}[kind];
+      o.type = "sine"; o.frequency.setValueAtTime(f[0], t0); o.frequency.exponentialRampToValueAtTime(f[1], t0 + .12);
+      gn.gain.setValueAtTime(0, t0); gn.gain.linearRampToValueAtTime(.05, t0 + .02); gn.gain.exponentialRampToValueAtTime(.0001, t0 + .16);
+      o.connect(gn); gn.connect(ac.destination); o.start(t0); o.stop(t0 + .18);
+    }
+    if (kind === "start" && navigator.vibrate) navigator.vibrate(12);
+  }catch(e){}
+}
+
+async function acquireMic(){
+  stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true, autoGainControl:true}});
+  await ensureAC();
+  srcNode = ac.createMediaStreamSource(stream); an = ac.createAnalyser(); an.fftSize = 1024; an.smoothingTimeConstant = .2;
+  srcNode.connect(an); fd = new Uint8Array(an.frequencyBinCount); td = new Uint8Array(an.fftSize);
+}
+function releaseMic(){
+  try{ if (srcNode) srcNode.disconnect(); }catch(e){}
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  stream = null; srcNode = null; an = null;
+}
+function micDead(){ return !stream || stream.getTracks().every(t => t.readyState === "ended"); }
+
+/* ---------- Gespräch ---------- */
+async function startLive(){
+  if (!navigator.mediaDevices || !window.MediaRecorder){
+    say("Dieser Browser kann nicht aufnehmen. Nutze Chrome oder Safari und öffne die Seite über https.", "err", true); return;
+  }
+  try{ await acquireMic(); }
+  catch(e){ say("Kein Zugriff auf das Mikrofon. Erlaube es in den Browser-Einstellungen und lade die Seite neu.", "err", true); return; }
+  live = true; $("endbtn").hidden = false; lockScreen(); listen();
+}
+
+function pickMime(){
+  return ["audio/mp4","audio/webm;codecs=opus","audio/webm","audio/ogg;codecs=opus"].find(m => MediaRecorder.isTypeSupported(m)) || "";
+}
+
+async function listen(){
+  if (!live || arming || (rec && rec.state === "recording")) return;
+  arming = true;
+  try{
+    if (micDead()){
+      try{ await acquireMic(); }
+      catch(e){ endLive("Das Mikrofon ist nicht mehr verfügbar. Tippe, um neu zu starten."); return; }
+    }
+    if (!live) return;
+    chunks = []; sendNext = false;
+    const mime = pickMime();
+    rec = new MediaRecorder(stream, mime ? {mimeType:mime} : undefined);
+    rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+    rec.onstop = onRecStop;
+    rec.start(250);
+    speechSeen = false; hinted = false; speechMs = 0; silenceMs = 0; listenMs = 0; rmsS = 0; noiseFloor = Infinity;
+    lastTick = performance.now();
+    clearInterval(vadTimer); vadTimer = setInterval(vadTick, 40);
+    setState("rec"); cue("start");
+  }finally{ arming = false; }
+}
+
+function onRecStop(){
+  clearInterval(vadTimer);
+  if (!sendNext) return;
+  sendNext = false;
+  const type = (rec.mimeType || "audio/webm").split(";")[0];
+  const blob = new Blob(chunks, {type});
+  if (blob.size < 1500){ if (live) listen(); else setState("idle"); return; }
+  lastBlob = blob; send(blob);
+}
+
+function vadTick(){
+  if (!rec || rec.state !== "recording" || !an) return;
+  const now = performance.now(), dt = Math.min(200, now - lastTick); lastTick = now;
+  an.getByteTimeDomainData(td);
+  let sum = 0; for (let i = 0; i < td.length; i++){ const v = (td[i] - 128) / 128; sum += v * v; }
+  rmsS = .5 * rmsS + .5 * Math.sqrt(sum / td.length);
+  listenMs += dt;
+  if (listenMs < 700){ if (listenMs > 200) noiseFloor = Math.min(noiseFloor, rmsS); return; }   /* Nachhall überspringen, Grundrauschen messen */
+  if (!isFinite(noiseFloor)) noiseFloor = .01;
+  const S = SENS[cfg.sens] || SENS.mid, thr = Math.min(S.max, Math.max(S.min, noiseFloor * S.m + .012));
+  if (rmsS > thr){
+    speechMs += dt; silenceMs = 0;
+    if (speechMs >= 250 && !speechSeen){ speechSeen = true; if (hinted){ hinted = false; $("status").textContent = LABEL.rec; } }
+  } else if (rmsS < thr * .85){
+    if (speechSeen) silenceMs += dt; else noiseFloor = noiseFloor * .97 + rmsS * .03;     /* Grundrauschen langsam nachführen */
+  }
+  if (!speechSeen && listenMs > 8000 && !hinted){ hinted = true; $("status").textContent = "Ich höre nichts · tippe zum Senden"; }
+  if (speechSeen && (silenceMs >= (PAUSE[cfg.pause] || 1300) || listenMs > 60000)) finishUtterance();
+  else if (!speechSeen && listenMs > 90000) endLive("Pause. Tippe, wenn du weiterreden willst.");
+}
+
+function finishUtterance(){
+  if (!rec || rec.state !== "recording") return;
+  clearInterval(vadTimer); sendNext = true; rec.stop();
+}
+
+function endLive(msg){
+  live = false; sendNext = false; clearInterval(vadTimer);
+  try{ if (rec && rec.state !== "inactive") rec.stop(); }catch(e){}
+  releaseMic(); unlockScreen(); $("endbtn").hidden = true; setState("idle");
+  if (msg) say(msg, "hint", true);
+}
+
+function fail(msg){
+  endLive();
+  say(msg + (lastBlob ? " Tippe auf „Erneut senden“." : ""), "err", true);
+  $("retry").hidden = !lastBlob;
+}
+
+async function send(blob){
+  if (!navigator.onLine){ fail("Keine Internetverbindung."); return; }
+  if (IOS) releaseMic();
+  busy = true; $("orb").disabled = true; $("retry").hidden = true; setState("think"); cue("send");
+  const type = blob.type || "audio/webm", ext = type.includes("mp4") ? "mp4" : type.includes("ogg") ? "ogg" : "webm";
+  const form = new FormData(); form.append("data", blob, "aufnahme." + ext);
+  const ctl = new AbortController(), kill = setTimeout(() => ctl.abort(), 120000);
+  const slow = setTimeout(() => { if (state === "think") $("status").textContent = "Das dauert etwas länger …"; }, 20000);
+  try{
+    const r = await fetch(WEBHOOK, {method:"POST", headers:{"x-jarvis-key":key}, body:form, signal:ctl.signal});
+    if (r.status === 401 || r.status === 403){
+      setKey(""); key = ""; lastBlob = null; endLive();
+      $("gateMsg").textContent = "Der Schlüssel stimmt nicht. Gib ihn nochmal ein."; showGate(true); return;
+    }
+    if (!r.ok) throw new Error(r.status >= 500 ? "Der Server hatte ein Problem (Status " + r.status + ")." : "Fehler (Status " + r.status + ").");
+    let j; try{ j = await r.json(); }catch(e){ throw new Error("Unerwartete Antwort vom Server."); }
+    lastBlob = null;
+    $("heard").textContent = j.heard ? "Du: " + j.heard : "";
+    say(j.text || "(keine Antwort)");
+    if (j.audio){ setAudio(j.audio); $("replay").hidden = false; speak(); }
+    else {
+      console.warn("Antwort ohne Audio. Keys:", Object.keys(j || {}));
+      if (live && cfg.auto) listen(); else endLive();
+    }
+  }catch(e){
+    fail(e.name === "AbortError" ? "Das hat zu lange gedauert." : (e.message || "Verbindung fehlgeschlagen.") + " Prüfe, ob der Workflow veröffentlicht ist.");
+  }finally{ clearTimeout(kill); clearTimeout(slow); busy = false; $("orb").disabled = false; }
+}
+
+function speak(){
+  setState("speak"); if (IOS) releaseMic(); hookOut(); cue("reply");
+  player.playbackRate = parseFloat(cfg.speed) || 1;
+  const p = player.play();
+  if (p && p.catch) p.catch(err => {
+    console.warn("play blocked", err);
+    $("status").textContent = "Audio blockiert · tippe „Nochmal abspielen“";
+    $("replay").hidden = false;
+  });
+}
+player.onended = () => {
+  if (state !== "speak") return;
+  setTimeout(() => {
+    if (state !== "speak") return;
+    if (live && cfg.auto) listen(); else endLive();
+  }, 700);
+};
+
+/* ---------- Bedienung ---------- */
+$("orb").addEventListener("click", () => {
+  unlockAudio(); ensureAC();
+  if (dragMoved){ dragMoved = false; return; }
+  shockT0 = performance.now();
+  if (busy) return;
+  if (state === "speak"){ player.pause(); if (live && cfg.auto) listen(); else endLive(); return; }
+  if (!live){ startLive(); return; }
+  if (rec && rec.state === "recording" && (speechSeen || listenMs > 1500)) finishUtterance();
+});
+$("endbtn").addEventListener("click", () => { player.pause(); endLive(); });
+$("retry").addEventListener("click", () => { unlockAudio(); ensureAC(); if (lastBlob && !busy) send(lastBlob); });
+$("replay").addEventListener("click", () => { unlockAudio(); ensureAC(); player.pause(); if (live) endLive(); player.currentTime = 0; speak(); });
+$("settings").addEventListener("click", () => { paintCfg(); $("sheet").style.display = "flex"; });
+$("sheetClose").addEventListener("click", () => { $("sheet").style.display = "none"; });
+$("change").addEventListener("click", () => {
+  endLive(); setKey(""); key = ""; $("key").value = ""; $("sheet").style.display = "none";
+  $("gateMsg").textContent = "Gib deinen Schlüssel ein. Er wird nur auf diesem Gerät gespeichert."; showGate(true);
+});
+$("save").addEventListener("click", () => {
+  const v = $("key").value.trim(); if (!v) return;
+  key = v; setKey(v); showGate(false);
+});
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "visible" || !live) return;
+  lockScreen();
+  if (!IOS && micDead() && state === "rec") endLive("Pause. Tippe, um weiterzureden.");
+});
+addEventListener("pagehide", () => endLive());
+
+/* ---------- Hologramm-Kugel ---------- */
+const cv = $("cv"), g = cv.getContext("2d"), orbEl = $("orb");
+let S = 0, lvlS = 0, spinS = 1, prevState = "idle", burst = 0, lastF = 0, avgDt = 16, lite = false;
+function resize(){
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  cv.width = cv.height = Math.round(cv.clientWidth * dpr); S = cv.width;
+}
+addEventListener("resize", resize);
+
+const TAU = 6.2832, N = 900, M = 170, FADE = .24;
+const PTS = [];
+for (let i = 0; i < N; i++){            /* Hülle der Kugel */
+  const y = 1 - i / (N - 1) * 2, r = Math.sqrt(1 - y * y), th = i * 2.399963, k = Math.random();
+  PTS.push({x:Math.cos(th) * r, y, z:Math.sin(th) * r, k, sz:.7 + Math.random() * 1.6, ph:Math.random() * TAU,
+    c:k < .08 ? [165,135,255] : k < .55 ? [255,150,45] : [255,222,150], sp:1, L:.5 + Math.random(), core:false});
+}
+for (let i = 0; i < M; i++){            /* leuchtender Kern */
+  const u = Math.random() * 2 - 1, th = Math.random() * TAU, r = Math.sqrt(1 - u * u), rf = .2 + Math.random() * .3;
+  PTS.push({x:Math.cos(th) * r * rf, y:u * rf, z:Math.sin(th) * r * rf, k:.8, sz:.7 + Math.random() * 1.2, ph:Math.random() * TAU,
+    c:[255,232,175], sp:1.9, L:.6 + Math.random() * .6, core:true});
+}
+const ORB = [
+  {R:158, tx:1.15, tz:.2,  sp:.55,  n:120, c:[255,205,120]},
+  {R:176, tx:.35,  tz:1.0, sp:-.42, n:120, c:[255,150,60]},
+  {R:140, tx:1.5,  tz:-.7, sp:.7,   n:100, c:[175,145,255]}
+];
+ORB.forEach(o => { o.p = Array.from({length:o.n}, (_, i) => ({a:i / o.n * TAU + Math.random() * .2, jr:(Math.random() * 2 - 1) * 7, jb:.4 + Math.random() * .8})); });
+
+function glob(x, y, z, ay, ax){
+  const c = Math.cos(ay), s = Math.sin(ay), cx = Math.cos(ax), sx = Math.sin(ax);
+  const x1 = x * c + z * s, z1 = -x * s + z * c, y2 = y * cx - z1 * sx, z2 = y * sx + z1 * cx, pr = 1 / (1 - z2 / 520);
+  return [x1 * pr, y2 * pr, z2];
+}
+function ringPt(R, o, phi){
+  const x = Math.cos(phi) * R, z = Math.sin(phi) * R;
+  const y1 = -z * Math.sin(o.tx), z1 = z * Math.cos(o.tx);
+  return [x * Math.cos(o.tz) - y1 * Math.sin(o.tz), x * Math.sin(o.tz) + y1 * Math.cos(o.tz), z1];
+}
+
+function level(t){
+  if (state === "rec" && an){
+    an.getByteFrequencyData(fd);
+    let s = 0; for (let i = 2; i < 60; i++) s += fd[i];
+    return Math.min(1, s / 58 / 130);
+  }
+  if (state === "speak"){
+    if (anOut && !player.paused){
+      anOut.getByteFrequencyData(fdOut);
+      let s = 0; for (let i = 2; i < 40; i++) s += fdOut[i];
+      return Math.min(1, s / 38 / 105);
+    }
+    return .3 + .35 * Math.abs(Math.sin(t * 6.2) * Math.sin(t * 2.3 + 1));
+  }
+  if (state === "think") return .18 + .1 * Math.sin(t * 4);
+  return .06 + .04 * Math.sin(t * 1.3);
+}
+
+function frame(now){
+  if (lastF){ avgDt = avgDt * .95 + Math.min(100, now - lastF) * .05; if (!lite && now > 4000 && avgDt > 27) lite = true; }   /* schwaches Gerät: weniger Teilchen */
+  lastF = now;
+  const t = RM ? 4 : now / 1000, lvl = RM ? .06 : level(t);
+  lvlS += (lvl - lvlS) * .16;
+  if (state !== prevState){ burst = 1; prevState = state; }
+  burst *= .94;
+  const spinT = state === "think" ? 3.4 : state === "rec" ? 1.5 : state === "speak" ? 1.3 : 1;
+  spinS += (spinT - spinS) * .04;
+  const boot = RM ? 1 : Math.min(1, now / 2600), e = 1 - Math.pow(1 - boot, 3);
+  orbEl.style.setProperty("--l", (lvlS * e).toFixed(3));
+
+  g.setTransform(1,0,0,1,0,0);
+  g.globalCompositeOperation = "destination-out";
+  g.fillStyle = RM ? "rgba(0,0,0,1)" : "rgba(0,0,0," + FADE + ")"; g.fillRect(0, 0, S, S);       /* Schweif durch Ausblenden */
+  g.globalCompositeOperation = "lighter";
+  g.translate(S / 2, S / 2); const k = S / 400 * (.5 + .5 * e); g.scale(k, k); g.globalAlpha = e;
+  g.lineCap = "round";
+
+  const R = 112 * (1 + .1 * lvlS + .05 * burst) * (state === "rec" ? .96 : 1);
+  const ay = t * .28 * spinS, ax = .38 + .12 * Math.sin(t * .23);
+
+  for (let i = 0; i < PTS.length; i++){
+    const p = PTS[i]; if (lite && !p.core && i % 2) continue;
+    const n = 1 + (.035 + .12 * lvlS) * Math.sin(t * 2.2 + p.ph * 3) + .04 * burst * Math.sin(p.ph * 5 + t * 6);
+    const x = p.x * n * R, y = p.y * n * R, z = p.z * n * R, dA = (.03 + .05 * spinS + .12 * lvlS) * p.L;
+    const h = glob(x, y, z, ay * p.sp, ax), tl = glob(x, y, z, (ay - dA) * p.sp, ax);
+    const depth = p.core ? .7 : (h[2] / R + 1) / 2;
+    const a = Math.min(1, (.3 + .7 * depth) * (.5 + .6 * p.k) * (.7 + .5 * lvlS) * (p.core ? .88 : .53));
+    g.strokeStyle = "rgba(" + p.c[0] + "," + p.c[1] + "," + p.c[2] + "," + a.toFixed(3) + ")";
+    g.lineWidth = Math.max(.55, p.sz * (.5 + .6 * depth) * .55);
+    g.beginPath(); g.moveTo(tl[0], tl[1]); g.lineTo(h[0], h[1]); g.stroke();
+  }
+  for (const o of ORB){
+    const sgn = o.sp > 0 ? 1 : -1, dphi = sgn * (.12 + .06 * spinS + .2 * lvlS);
+    for (let i = 0; i < o.p.length; i++){
+      const q = o.p[i]; if (lite && i % 2) continue;
+      const phi = q.a + t * o.sp * spinS, Rr = o.R + q.jr;
+      const h = glob(...ringPt(Rr, o, phi), ay, ax), tl = glob(...ringPt(Rr, o, phi - dphi * q.jb), ay, ax);
+      const depth = (h[2] / o.R + 1) / 2, a = Math.min(1, (.25 + .75 * depth) * q.jb * (.8 + .6 * lvlS) * .57);
+      g.strokeStyle = "rgba(" + o.c[0] + "," + o.c[1] + "," + o.c[2] + "," + a.toFixed(3) + ")";
+      g.lineWidth = 1.3;
+      g.beginPath(); g.moveTo(tl[0], tl[1]); g.lineTo(h[0], h[1]); g.stroke();
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
+/* ---------- WebGL-Hologramm (GPU) ---------- */
+let useGL = false;
+function startVisuals(){
+  try{ useGL = initGL(); }
+  catch(err){ console.warn("WebGL aus:", err); useGL = false; document.body.classList.remove("gl"); const old = document.getElementById("gl"); if (old) old.remove(); }
+  if (!useGL) requestAnimationFrame(frame);
+}
+
+function initGL(){
+  const c = document.createElement("canvas"); c.id = "gl"; c.setAttribute("aria-hidden", "true");
+  const gl = c.getContext("webgl", {antialias:false, alpha:false, depth:false, stencil:false, powerPreference:"high-performance"});
+  if (!gl) return false;
+  const FP = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n";
+  const NOISE = `float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float noise(vec2 p){ vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y); }
+float fbm(vec2 p){ float v = 0.0; float a = 0.5; for (int i = 0; i < 4; i++){ v += a * noise(p); p = p * 2.03 + vec2(1.7, 9.2); a *= 0.5; } return v; }
+`;
+  const VS_TRI = "attribute vec2 a_p; void main(){ gl_Position = vec4(a_p, 0.0, 1.0); }";
+  const VS_PTS = `precision highp float;
+attribute vec3 a_a; attribute vec2 a_r;
+uniform vec2 u_res; uniform vec2 u_c;
+uniform float u_scale; uniform float u_R; uniform float u_t; uniform float u_yaw; uniform float u_pit; uniform float u_lvl;
+uniform float u_spin; uniform float u_boot; uniform float u_gain; uniform float u_ps; uniform float u_twist; uniform float u_kind;
+uniform float u_b[16];
+varying vec3 v_c; varying float v_a;
+void main(){
+  vec3 w; vec3 col; float alpha; float size;
+  float cyw = cos(u_yaw); float syw = sin(u_yaw); float cpt = cos(u_pit); float spt = sin(u_pit);
+  if (u_kind < 0.5){
+    float lat = a_a.y * 0.5 + 0.5; float band = 0.0;
+    for (int i = 0; i < 16; i++){ band += max(0.0, 1.0 - abs(lat * 15.0 - float(i))) * u_b[i]; }
+    float n = sin(u_t * 1.7 + a_r.x * 40.0) + sin(u_t * 2.9 + a_r.y * 30.0);
+    float rad = 1.0 + 0.02 * n * (0.4 + u_lvl * 2.0) + band * 0.30 * (0.35 + 0.65 * a_r.x);
+    vec3 q = a_a * rad;
+    vec3 sc = (vec3(a_r.x, a_r.y, fract(a_r.x * 7.31 + a_r.y * 3.7)) * 2.0 - 1.0) * 2.6;
+    q = mix(sc, q, u_boot);
+    float ya = u_yaw + u_twist * a_a.y;
+    q = vec3(q.x * cos(ya) + q.z * sin(ya), q.y, -q.x * sin(ya) + q.z * cos(ya));
+    q = vec3(q.x, q.y * cpt - q.z * spt, q.y * spt + q.z * cpt);
+    w = q * u_R;
+    float depth = clamp(q.z * 0.5 + 0.5, 0.0, 1.0);
+    float k = a_r.x;
+    col = mix(vec3(1.0, 0.45, 0.10), vec3(1.0, 0.78, 0.38), smoothstep(0.35, 0.7, k));
+    col = mix(col, vec3(1.0, 0.93, 0.72), smoothstep(0.86, 0.95, k));
+    col = mix(vec3(0.55, 0.45, 1.0), col, smoothstep(0.05, 0.09, k));
+    alpha = (0.2 + 0.8 * depth) * (0.5 + 0.7 * a_r.y) * (0.75 + 0.6 * u_lvl + band * 0.8);
+    size = u_ps * (0.55 + 1.1 * a_r.y) * (0.6 + 0.7 * depth) * (1.0 + band * 0.8);
+  } else {
+    float id = a_a.y;
+    float R0 = id < 0.5 ? 158.0 : (id < 1.5 ? 176.0 : 140.0);
+    float tx = id < 0.5 ? 1.15 : (id < 1.5 ? 0.35 : 1.5);
+    float tz = id < 0.5 ? 0.2 : (id < 1.5 ? 1.0 : -0.7);
+    float spd = id < 0.5 ? 0.55 : (id < 1.5 ? -0.42 : 0.7);
+    float phi = a_a.x + u_t * spd * u_spin;
+    float Rr = (R0 + a_a.z * 7.0 + 7.0 * u_lvl * sin(phi * 5.0 + u_t * 3.0)) * mix(2.4 + a_r.x, 1.0, u_boot);
+    float x = cos(phi) * Rr; float z = sin(phi) * Rr;
+    float y1 = -z * sin(tx); float z1 = z * cos(tx);
+    w = vec3(x * cos(tz) - y1 * sin(tz), x * sin(tz) + y1 * cos(tz), z1);
+    w = vec3(w.x * cyw + w.z * syw, w.y, -w.x * syw + w.z * cyw);
+    w = vec3(w.x, w.y * cpt - w.z * spt, w.y * spt + w.z * cpt);
+    float depth = clamp(w.z / R0 * 0.5 + 0.5, 0.0, 1.0);
+    float comet = pow(0.5 + 0.5 * sin(phi * 2.0 - u_t * 2.2 * sign(spd)), 4.0);
+    col = id < 0.5 ? vec3(1.0, 0.80, 0.42) : (id < 1.5 ? vec3(1.0, 0.48, 0.12) : vec3(0.62, 0.50, 1.0));
+    alpha = (0.15 + 0.85 * depth) * (0.25 + 0.9 * comet) * (0.6 + 0.8 * a_r.y) * (0.8 + 0.6 * u_lvl);
+    size = u_ps * (0.8 + 1.5 * comet) * (0.7 + 0.6 * depth) * (0.6 + 0.8 * a_r.y);
+  }
+  float pr = 1.0 / (1.0 - w.z / 520.0);
+  vec2 s = w.xy * pr * u_scale;
+  gl_Position = vec4((u_c.x + s.x) / u_res.x * 2.0 - 1.0, 1.0 - (u_c.y + s.y) / u_res.y * 2.0, 0.0, 1.0);
+  gl_PointSize = max(1.0, size * pr);
+  v_c = col; v_a = alpha * u_gain * smoothstep(0.0, 0.5, u_boot);
+}`;
+  const FS_PTS = `varying vec3 v_c; varying float v_a;
+void main(){ vec2 d = gl_PointCoord - 0.5; float r2 = dot(d, d) * 4.0; if (r2 > 1.0) discard;
+  float f = exp(-r2 * 3.2) + 0.6 * exp(-r2 * 16.0); gl_FragColor = vec4(v_c * v_a * f, 1.0); }`;
+  const FS_CORE = NOISE + `uniform vec2 u_cg; uniform float u_rad; uniform float u_t; uniform float u_lvl; uniform float u_boot; uniform float u_gain;
+void main(){
+  vec2 p = (gl_FragCoord.xy - u_cg) / u_rad; float r = length(p);
+  if (r > 1.7){ gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0); return; }
+  vec2 w1 = vec2(fbm(p * 2.4 + vec2(u_t * 0.35, -u_t * 0.28)), fbm(p * 2.4 + vec2(-u_t * 0.3, u_t * 0.4) + 7.3));
+  float n = fbm(p * 2.8 + w1 * 1.7 + u_t * 0.15);
+  float plasma = pow(n, 1.6) * exp(-r * r * 3.2) * 1.6;
+  vec3 col = vec3(1.0, 0.42, 0.10) * plasma + vec3(1.0, 0.70, 0.35) * exp(-r * r * 7.0) * 0.5
+           + vec3(1.0, 0.96, 0.88) * exp(-r * r * 55.0) * (0.7 + 0.9 * u_lvl);
+  col *= (0.55 + 0.7 * u_lvl) * u_gain * u_boot;
+  gl_FragColor = vec4(col, 1.0);
+}`;
+  const FS_BRIGHT = `uniform sampler2D u_s; uniform vec2 u_res; uniform vec2 u_tx;
+void main(){ vec2 uv = gl_FragCoord.xy / u_res;
+  vec3 c = texture2D(u_s, uv + u_tx * vec2(1.5, 1.5)).rgb + texture2D(u_s, uv + u_tx * vec2(-1.5, 1.5)).rgb
+         + texture2D(u_s, uv + u_tx * vec2(1.5, -1.5)).rgb + texture2D(u_s, uv + u_tx * vec2(-1.5, -1.5)).rgb;
+  c *= 0.25; float l = max(c.r, max(c.g, c.b)); gl_FragColor = vec4(c * smoothstep(0.30, 0.85, l), 1.0); }`;
+  const FS_BLUR = `uniform sampler2D u_s; uniform vec2 u_res; uniform vec2 u_dir;
+void main(){ vec2 uv = gl_FragCoord.xy / u_res;
+  vec3 c = texture2D(u_s, uv).rgb * 0.227027;
+  c += (texture2D(u_s, uv + u_dir).rgb + texture2D(u_s, uv - u_dir).rgb) * 0.1945946;
+  c += (texture2D(u_s, uv + u_dir * 2.0).rgb + texture2D(u_s, uv - u_dir * 2.0).rgb) * 0.1216216;
+  c += (texture2D(u_s, uv + u_dir * 3.0).rgb + texture2D(u_s, uv - u_dir * 3.0).rgb) * 0.054054;
+  c += (texture2D(u_s, uv + u_dir * 4.0).rgb + texture2D(u_s, uv - u_dir * 4.0).rgb) * 0.016216;
+  gl_FragColor = vec4(c, 1.0); }`;
+  const FS_COMP = NOISE + `uniform sampler2D u_s; uniform sampler2D u_bl; uniform vec2 u_res; uniform vec2 u_cg;
+uniform float u_rad; uniform float u_t; uniform float u_lvl; uniform float u_bloom; uniform float u_shock;
+void main(){
+  vec2 uv = gl_FragCoord.xy / u_res; vec2 p = (gl_FragCoord.xy - 0.5 * u_res) / u_res.y;
+  float n1 = fbm(p * 1.5 + vec2(u_t * 0.02, -u_t * 0.015));
+  float n2 = fbm(p * 3.0 - vec2(u_t * 0.03, u_t * 0.012) + n1 * 1.6);
+  vec3 col = mix(vec3(0.015, 0.010, 0.050), vec3(0.17, 0.075, 0.36), n1) + vec3(0.04, 0.09, 0.28) * n2 * (1.1 - uv.y);
+  vec2 q = (gl_FragCoord.xy - u_cg) / u_rad; float d = length(q);
+  col += vec3(1.0, 0.50, 0.12) * exp(-d * d * 0.35) * (0.10 + 0.22 * u_lvl);
+  float h = hash(floor(gl_FragCoord.xy / 2.5));
+  col += vec3(0.9, 0.85, 1.0) * step(0.9985, h) * max(0.0, 0.4 + 0.6 * sin(u_t * 2.5 + h * 60.0));
+  float rr = u_shock * 0.9 * u_res.y; float dd = length(gl_FragCoord.xy - u_cg) - rr;
+  col += vec3(1.0, 0.70, 0.35) * exp(-dd * dd / (0.0006 * u_res.y * u_res.y)) * (1.0 - u_shock) * step(0.0, u_shock);
+  col += texture2D(u_s, uv).rgb + texture2D(u_bl, uv).rgb * u_bloom;
+  vec2 vv = uv - 0.5; col *= 1.0 - 0.7 * dot(vv, vv);
+  gl_FragColor = vec4(col, 1.0);
+}`;
+
+  function sh(type, src){ const o = gl.createShader(type); gl.shaderSource(o, src); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(o)); return o; }
+  function mk(vs, fs, attrs){
+    const pg = gl.createProgram(); gl.attachShader(pg, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(pg, sh(gl.FRAGMENT_SHADER, FP + fs));
+    attrs.forEach((n, i) => gl.bindAttribLocation(pg, i, n)); gl.linkProgram(pg);
+    if (!gl.getProgramParameter(pg, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(pg));
+    pg.u = {}; return pg;
+  }
+  const loc = (pg, n) => (n in pg.u) ? pg.u[n] : (pg.u[n] = gl.getUniformLocation(pg, n));
+  const pPts = mk(VS_PTS, FS_PTS, ["a_a", "a_r"]);
+  const pFlat = mk(VS_TRI, "uniform vec4 u_col; void main(){ gl_FragColor = u_col; }", ["a_p"]);
+  const pCore = mk(VS_TRI, FS_CORE, ["a_p"]), pBright = mk(VS_TRI, FS_BRIGHT, ["a_p"]);
+  const pBlur = mk(VS_TRI, FS_BLUR, ["a_p"]), pComp = mk(VS_TRI, FS_COMP, ["a_p"]);
+
+  /* Teilchen: zuerst die Kugel, dann die Ringe (jeweils gemischt, damit Teilmengen gleichmäßig aussehen) */
+  const N = 11000, NR = 7800, data = new Float32Array((N + NR) * 5);
+  const idx = Array.from({length:N}, (_, i) => i);
+  for (let i = N - 1; i > 0; i--){ const j = (Math.random() * (i + 1)) | 0; const tmp = idx[i]; idx[i] = idx[j]; idx[j] = tmp; }
+  for (let k = 0; k < N; k++){
+    const i = idx[k], y = 1 - i / (N - 1) * 2, r = Math.sqrt(1 - y * y), th = i * 2.399963, o = k * 5;
+    data[o] = Math.cos(th) * r; data[o + 1] = y; data[o + 2] = Math.sin(th) * r; data[o + 3] = Math.random(); data[o + 4] = Math.random();
+  }
+  for (let k = 0; k < NR; k++){
+    const o = (N + k) * 5;
+    data[o] = Math.random() * 6.2831853; data[o + 1] = Math.floor(Math.random() * 3); data[o + 2] = Math.random() * 2 - 1;
+    data[o + 3] = Math.random(); data[o + 4] = Math.random();
+  }
+  const ptsBuf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, ptsBuf); gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+  const triBuf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, triBuf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0); gl.enableVertexAttribArray(1);
+  function tri(){ gl.bindBuffer(gl.ARRAY_BUFFER, triBuf); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0); gl.drawArrays(gl.TRIANGLES, 0, 3); }
+
+  /* Bildpuffer: T = Szene mit Schweif, A/B = unscharfer Leuchtschleier */
+  let rs = 1, qf = 1, W = 2, H = 2, T = null, A = null, B = null;
+  function mkFB(w, h){
+    const tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    const fb = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw new Error("Framebuffer unvollständig");
+    gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+    return {tex, fb, w, h};
+  }
+  const kill = f => { if (f){ gl.deleteTexture(f.tex); gl.deleteFramebuffer(f.fb); } };
+  function setSize(){
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.75);
+    W = Math.max(4, Math.floor(innerWidth * dpr * rs)); H = Math.max(4, Math.floor(innerHeight * dpr * rs));
+    c.width = W; c.height = H;
+    kill(T); kill(A); kill(B);
+    T = mkFB(W, H); A = mkFB(Math.max(2, W >> 2), Math.max(2, H >> 2)); B = mkFB(A.w, A.h);
+  }
+  setSize();
+  addEventListener("resize", () => { if (useGL) setSize(); });
+  c.addEventListener("webglcontextlost", e => { e.preventDefault(); fallback(); });
+
+  /* Bänder aus dem Klang (Mikrofon beim Zuhören, Jarvis beim Sprechen) */
+  const BANDS = new Float32Array(16);
+  function updBands(t){
+    let arr = null;
+    if (state === "rec" && an && fd){ an.getByteFrequencyData(fd); arr = fd; }
+    else if (state === "speak" && anOut && fdOut && !player.paused){ anOut.getByteFrequencyData(fdOut); arr = fdOut; }
+    for (let i = 0; i < 16; i++){
+      let v;
+      if (arr){
+        const hi = arr.length * .5, a0 = Math.floor(hi * Math.pow(i / 16, 1.6)), a1 = Math.max(a0 + 1, Math.floor(hi * Math.pow((i + 1) / 16, 1.6)));
+        let sum = 0; for (let j = a0; j < a1; j++) sum += arr[j];
+        v = Math.min(1, sum / (a1 - a0) / 255 * 1.9);
+      } else if (state === "speak") v = .25 + .4 * Math.abs(Math.sin(t * 6 + i * .9) * Math.sin(t * 2.3 + i * .4));
+      else if (state === "think") v = .12 + .22 * Math.max(0, Math.sin(t * 5 - i * .6));
+      else if (state === "rec") v = .08 + .05 * Math.sin(t * 2 + i);
+      else v = .05 + .04 * Math.sin(t * 1.3 + i * .7);
+      BANDS[i] += (v - BANDS[i]) * (v > BANDS[i] ? .5 : .15);
+    }
+  }
+
+  /* Ziehen dreht die Kugel, kurzes Tippen startet das Gespräch */
+  let dragging = false, dragX = 0, dragY = 0, dragDist = 0, vyaw = 0, vpit = 0, dpit = 0;
+  orbEl.addEventListener("pointerdown", e => { dragging = true; dragMoved = false; dragX = e.clientX; dragY = e.clientY; dragDist = 0; });
+  addEventListener("pointermove", e => {
+    if (!dragging) return;
+    const dx = e.clientX - dragX, dy = e.clientY - dragY; dragX = e.clientX; dragY = e.clientY;
+    dragDist += Math.abs(dx) + Math.abs(dy); if (dragDist > 12) dragMoved = true;
+    vyaw += dx * .004; vpit += dy * .003;
+  });
+  addEventListener("pointerup", () => { dragging = false; });
+  addEventListener("pointercancel", () => { dragging = false; });
+
+  const FX = {low:{f:.45, bloom:.8, gain:1.0}, mid:{f:.8, bloom:1.1, gain:1.5}, high:{f:1, bloom:1.5, gain:2.0}};
+  const t0 = performance.now(); let lastT = t0, yaw = 0, spin = 1, twist = 0, glLvl = 0, lastState = state, avgMs = 16, lastAdj = 0, first = true;
+  const Z = new Float32Array(16);
+
+  function setPts(F, t, lvl, spinV, yawV, pitV, eb, sc, cx, cy, R){
+    const u = n => loc(pPts, n);
+    gl.uniform2f(u("u_res"), W, H); gl.uniform2f(u("u_c"), cx, cy);
+    gl.uniform1f(u("u_scale"), sc); gl.uniform1f(u("u_R"), R); gl.uniform1f(u("u_t"), t); gl.uniform1f(u("u_yaw"), yawV);
+    gl.uniform1f(u("u_pit"), pitV); gl.uniform1f(u("u_lvl"), lvl); gl.uniform1f(u("u_spin"), spinV); gl.uniform1f(u("u_boot"), eb);
+    gl.uniform1f(u("u_gain"), F.gain); gl.uniform1f(u("u_ps"), 2.6 * sc); gl.uniform1f(u("u_twist"), twist);
+    gl.uniform1fv(u("u_b"), BANDS);
+  }
+
+  function draw(now){
+    const t = RM ? 4 : now / 1000, dt = Math.min(.05, (now - lastT) / 1000); lastT = now;
+    avgMs = avgMs * .95 + dt * 1000 * .05;
+    if (now - lastAdj > 3000 && avgMs > 30){ lastAdj = now; avgMs = 16; if (rs > .56){ rs -= .12; setSize(); } else qf = Math.max(.45, qf - .12); }
+    const F = FX[cfg.fx] || FX.mid, frac = F.f * qf;
+    if (state !== lastState){ lastState = state; shockT0 = now; }
+    updBands(t);
+    glLvl += ((RM ? .06 : level(t)) - glLvl) * .16;
+    const spT = state === "think" ? 3.4 : state === "rec" ? 1.5 : state === "speak" ? 1.3 : 1; spin += (spT - spin) * .04;
+    twist += ((state === "think" ? 2.4 : 0) - twist) * .03;
+    vyaw *= .95; vpit *= .95; dpit = (dpit + vpit) * .995; yaw += dt * .28 * spin + vyaw;
+    const pit = .38 + .12 * Math.sin(t * .23) + dpit;
+    const boot = RM ? 1 : Math.min(1, (now - t0) / 2800), eb = 1 - Math.pow(1 - boot, 3);
+    const r = orbEl.getBoundingClientRect(), kx = W / innerWidth;
+    const cx = (r.left + r.width / 2) * kx, cy = (r.top + r.height / 2) * (H / innerHeight), sc = Math.min(r.width, r.height) / 400 * kx;
+    const R = 112 * (1 + .1 * glLvl) * (state === "rec" ? .96 : 1);
+    const shock = (now - shockT0) / 1300, shk = shock < 1 ? shock : -1;
+
+    /* 1) Szene mit Schweif */
+    gl.bindFramebuffer(gl.FRAMEBUFFER, T.fb); gl.viewport(0, 0, W, H);
+    gl.enable(gl.BLEND); gl.useProgram(pFlat);
+    gl.blendEquation(gl.FUNC_ADD); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.uniform4f(loc(pFlat, "u_col"), 0, 0, 0, .22); tri();
+    gl.blendEquation(gl.FUNC_REVERSE_SUBTRACT); gl.blendFunc(gl.ONE, gl.ONE);
+    gl.uniform4f(loc(pFlat, "u_col"), .006, .006, .006, 0); tri();
+    gl.blendEquation(gl.FUNC_ADD);
+    gl.useProgram(pCore);
+    gl.uniform2f(loc(pCore, "u_cg"), cx, H - cy); gl.uniform1f(loc(pCore, "u_rad"), 70 * sc); gl.uniform1f(loc(pCore, "u_t"), t);
+    gl.uniform1f(loc(pCore, "u_lvl"), glLvl); gl.uniform1f(loc(pCore, "u_boot"), eb); gl.uniform1f(loc(pCore, "u_gain"), F.gain); tri();
+    gl.useProgram(pPts); gl.bindBuffer(gl.ARRAY_BUFFER, ptsBuf);
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 20, 0); gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 20, 12);
+    setPts(F, t, glLvl, spin, yaw, pit, eb, sc, cx, cy, R);
+    gl.uniform1f(loc(pPts, "u_kind"), 0); gl.drawArrays(gl.POINTS, 0, Math.floor(N * frac));
+    gl.uniform1f(loc(pPts, "u_kind"), 1); gl.drawArrays(gl.POINTS, N, Math.floor(NR * frac));
+    gl.disable(gl.BLEND);
+
+    /* 2) Leuchtschleier: hell herausfiltern und weich verwischen */
+    gl.bindFramebuffer(gl.FRAMEBUFFER, A.fb); gl.viewport(0, 0, A.w, A.h); gl.useProgram(pBright);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, T.tex); gl.uniform1i(loc(pBright, "u_s"), 0);
+    gl.uniform2f(loc(pBright, "u_res"), A.w, A.h); gl.uniform2f(loc(pBright, "u_tx"), 1 / W, 1 / H); tri();
+    gl.useProgram(pBlur); gl.uniform1i(loc(pBlur, "u_s"), 0); gl.uniform2f(loc(pBlur, "u_res"), A.w, A.h);
+    const passes = [[A, B, 1, 0, 1.4], [B, A, 0, 1, 1.4], [A, B, 1, 0, 3.2], [B, A, 0, 1, 3.2]];
+    for (const [src, dst, hx, hy, wd] of passes){
+      gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fb); gl.bindTexture(gl.TEXTURE_2D, src.tex);
+      gl.uniform2f(loc(pBlur, "u_dir"), hx * wd / A.w, hy * wd / A.h); tri();
+    }
+
+    /* 3) Zusammensetzen: Nebel, Sterne, Szene, Schleier, Druckwelle */
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, W, H); gl.useProgram(pComp);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, T.tex); gl.uniform1i(loc(pComp, "u_s"), 0);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, A.tex); gl.uniform1i(loc(pComp, "u_bl"), 1);
+    gl.uniform2f(loc(pComp, "u_res"), W, H); gl.uniform2f(loc(pComp, "u_cg"), cx, H - cy); gl.uniform1f(loc(pComp, "u_rad"), 160 * sc);
+    gl.uniform1f(loc(pComp, "u_t"), t); gl.uniform1f(loc(pComp, "u_lvl"), glLvl); gl.uniform1f(loc(pComp, "u_bloom"), F.bloom * (1 + .5 * glLvl));
+    gl.uniform1f(loc(pComp, "u_shock"), shk); tri();
+    gl.activeTexture(gl.TEXTURE0);
+    if (first){ first = false; const err = gl.getError(); if (err) throw new Error("GL-Fehler " + err); }
+  }
+
+  function loop(now){
+    if (!useGL) return;
+    requestAnimationFrame(loop);
+    try{ draw(now); }catch(err){ console.warn("WebGL-Fehler:", err); fallback(); }
+  }
+  function fallback(){ useGL = false; c.remove(); document.body.classList.remove("gl"); requestAnimationFrame(frame); }
+
+  document.body.insertBefore(c, document.body.firstChild); document.body.classList.add("gl");
+  requestAnimationFrame(loop);
+  return true;
+}
+
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+resize();
+key = getKey(); showGate(!key);
+setTimeout(() => { if (state === "idle") setState("idle"); }, RM ? 100 : 2600);
+startVisuals();
+</script>
+</body>
+</html>
