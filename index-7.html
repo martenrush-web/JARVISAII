@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>JARVIS • Holographic Core</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Share+Tech+Mono&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    background: #02050c;
+    font-family: 'Orbitron', sans-serif;
+    color: #8ec8ff;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+  }
+
+  #canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%; height: 100%;
+    display: block;
+    cursor: grab;
+  }
+  #canvas:active { cursor: grabbing; }
+
+  #topbar {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 18px;
+    background: linear-gradient(180deg, rgba(0,8,22,0.75) 0%, transparent 100%);
+    z-index: 20;
+    pointer-events: none;
+  }
+  #topbar .logo {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 3.5px;
+    color: #9ad4ff;
+    opacity: 0.9;
+  }
+  #topbar .logo span { color: #e8a04a; }
+  #status {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+    opacity: 0.6;
+  }
+
+  #footer {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    padding: 16px 16px 22px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    background: linear-gradient(0deg, rgba(0,6,18,0.85) 0%, transparent 100%);
+    z-index: 20;
+    pointer-events: none;
+  }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    pointer-events: auto;
+  }
+
+  .btn {
+    background: rgba(8, 28, 55, 0.6);
+    border: 1px solid rgba(90, 160, 230, 0.28);
+    color: #8ec8ff;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 1.2px;
+    padding: 9px 14px;
+    border-radius: 24px;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    backdrop-filter: blur(6px);
+    text-transform: uppercase;
+  }
+  .btn:hover, .btn.active {
+    background: rgba(12, 50, 100, 0.75);
+    border-color: #5ab0ff;
+    color: #e8f4ff;
+  }
+  .btn:active { transform: scale(0.97); }
+
+  #hint {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    opacity: 0.45;
+    letter-spacing: 0.4px;
+  }
+
+  #strength-wrap {
+    position: absolute;
+    top: 62px;
+    left: 16px;
+    z-index: 25;
+    pointer-events: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    opacity: 0.7;
+  }
+  #strength-wrap label {
+    font-size: 9px;
+    letter-spacing: 1px;
+    opacity: 0.65;
+  }
+  #strength {
+    width: 96px;
+    accent-color: #4a9fff;
+  }
+
+  #boot {
+    position: absolute;
+    inset: 0;
+    background: #02050c;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.9s ease;
+  }
+  #boot.hide { opacity: 0; pointer-events: none; }
+  #boot .title {
+    font-size: clamp(18px, 4.2vw, 28px);
+    font-weight: 700;
+    letter-spacing: 6px;
+    color: #7ec0ff;
+    margin-bottom: 22px;
+    opacity: 0.9;
+  }
+  #boot .bar {
+    width: min(240px, 65vw);
+    height: 2px;
+    background: rgba(30,70,130,0.35);
+    border-radius: 1px;
+    overflow: hidden;
+  }
+  #boot .bar > div {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #1a6ec8, #4ab0ff);
+    transition: width 0.12s linear;
+  }
+  #boot .msg {
+    margin-top: 14px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    opacity: 0.55;
+  }
+
+  #fallback {
+    display: none;
+    position: absolute;
+    inset: 0;
+    background: #02050c;
+    z-index: 100;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 28px;
+    text-align: center;
+  }
+  #fallback h1 { color: #ff6b8a; margin-bottom: 10px; letter-spacing: 2px; font-size: 18px; }
+  #fallback p { opacity: 0.6; max-width: 360px; line-height: 1.5; font-size: 13px; }
+</style>
+</head>
+<body>
+  <div id="boot">
+    <div class="title">J.A.R.V.I.S</div>
+    <div class="bar"><div id="bootbar"></div></div>
+    <div class="msg" id="bootmsg">INITIALIZING...</div>
+  </div>
+
+  <div id="fallback">
+    <h1>WEBGL REQUIRED</h1>
+    <p>This interface needs a browser with WebGL support and hardware acceleration.</p>
+  </div>
+
+  <canvas id="canvas"></canvas>
+
+  <div id="topbar">
+    <div class="logo">JARVIS <span>CORE</span></div>
+    <div id="status">ONLINE</div>
+  </div>
+
+  <div id="strength-wrap">
+    <label>INTENSITY</label>
+    <input type="range" id="strength" min="0.4" max="1.4" step="0.05" value="0.85">
+  </div>
+
+  <div id="footer">
+    <div class="controls">
+      <button class="btn" id="btn-pulse">PULSE</button>
+      <button class="btn" id="btn-shock">SHOCK</button>
+      <button class="btn active" id="btn-trails">TRAILS</button>
+    </div>
+    <div id="hint">DRAG TO ROTATE · CLICK TO PULSE · SCROLL TO ZOOM</div>
+  </div>
+
+<script>
+(function () {
+  'use strict';
+
+  const $ = id => document.getElementById(id);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const rand = (a = 0, b = 1) => a + Math.random() * (b - a);
+  const TAU = Math.PI * 2;
+
+  // ---------- Boot ----------
+  const boot = $('boot');
+  const bootbar = $('bootbar');
+  const bootmsg = $('bootmsg');
+  const messages = [
+    'INITIALIZING...',
+    'LOADING PARTICLE MATRIX...',
+    'COMPILING SHADERS...',
+    'ALLOCATING BUFFERS...',
+    'CORE ONLINE'
+  ];
+  let bootProgress = 0;
+  let startExperience = function () {};
+
+  // ---------- WebGL ----------
+  const canvas = $('canvas');
+  let gl = canvas.getContext('webgl2', { antialias: false, alpha: false, powerPreference: 'high-performance' })
+         || canvas.getContext('webgl', { antialias: false, alpha: false });
+
+  if (!gl) {
+    $('fallback').style.display = 'flex';
+    boot.style.display = 'none';
+    return;
+  }
+
+  const isWebGL2 = (typeof WebGL2RenderingContext !== 'undefined') && (gl instanceof WebGL2RenderingContext);
+
+  // Boot only when WebGL works
+  const bootInterval = setInterval(() => {
+    bootProgress += rand(10, 22);
+    if (bootProgress >= 100) {
+      bootProgress = 100;
+      clearInterval(bootInterval);
+      bootmsg.textContent = messages[messages.length - 1];
+      setTimeout(() => {
+        boot.classList.add('hide');
+        setTimeout(() => boot.remove(), 1000);
+        startExperience();
+      }, 450);
+    } else {
+      bootmsg.textContent = messages[Math.min(messages.length - 2, Math.floor(bootProgress / 100 * (messages.length - 1)))];
+    }
+    bootbar.style.width = bootProgress + '%';
+  }, 140);
+
+  function compileShader(type, source) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, source);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+      console.error(gl.getShaderInfoLog(s));
+      throw new Error('Shader compile failed');
+    }
+    return s;
+  }
+
+  function createProgram(vsSrc, fsSrc) {
+    const p = gl.createProgram();
+    gl.attachShader(p, compileShader(gl.VERTEX_SHADER, vsSrc));
+    gl.attachShader(p, compileShader(gl.FRAGMENT_SHADER, fsSrc));
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+      console.error(gl.getProgramInfoLog(p));
+      throw new Error('Program link failed');
+    }
+    return p;
+  }
+
+  function getUniforms(program, names) {
+    const u = {};
+    names.forEach(n => u[n] = gl.getUniformLocation(program, n));
+    return u;
+  }
+
+  // Fullscreen quad
+  const quadBuf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+    -1,-1, 1,-1, -1,1,  1,-1, 1,1, -1,1
+  ]), gl.STATIC_DRAW);
+
+  function createFBO(w, h) {
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    const fbo = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    return { fbo, tex, w, h };
+  }
+
+  let sceneFBO, brightFBO, blurFBO1, blurFBO2, trailFBO1, trailFBO2;
+  let bloomW, bloomH;
+  let trailSrc = 0;
+
+  function resizeFBOs() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.75);
+    const w = canvas.width = Math.floor(innerWidth * dpr);
+    const h = canvas.height = Math.floor(innerHeight * dpr);
+    canvas.style.width = innerWidth + 'px';
+    canvas.style.height = innerHeight + 'px';
+
+    bloomW = Math.max(1, Math.floor(w * 0.4));
+    bloomH = Math.max(1, Math.floor(h * 0.4));
+
+    sceneFBO = createFBO(w, h);
+    brightFBO = createFBO(bloomW, bloomH);
+    blurFBO1 = createFBO(bloomW, bloomH);
+    blurFBO2 = createFBO(bloomW, bloomH);
+    trailFBO1 = createFBO(w, h);
+    trailFBO2 = createFBO(w, h);
+  }
+  resizeFBOs();
+  window.addEventListener('resize', resizeFBOs);
+
+  // ---------- Shaders (lean) ----------
+  const particleVS = `
+    attribute vec3 aPos;
+    attribute float aSize;
+    attribute vec3 aColor;
+    attribute float aPhase;
+    attribute float aType;
+
+    uniform mat4 uViewProj;
+    uniform float uTime;
+    uniform float uPulse;
+    uniform float uShock;
+    uniform float uIntensity;
+    uniform vec3 uCamPos;
+
+    varying vec3 vColor;
+    varying float vAlpha;
+
+    void main() {
+      vec3 pos = aPos;
+      float t = uTime + aPhase * 6.2832;
+
+      // gentle breathing
+      float breathe = 1.0 + 0.025 * sin(t * 1.4);
+      pos *= breathe;
+
+      // pulse
+      float pulse = 1.0 + uPulse * 0.22 * (0.55 + 0.45 * sin(aPhase * 12.0));
+      pos *= pulse;
+
+      // shockwave
+      float dist = length(pos);
+      float shockWave = max(0.0, 1.0 - abs(dist - uShock * 2.2) * 2.4);
+      pos += normalize(pos + 0.0001) * shockWave * 0.28 * uIntensity;
+
+      // ring orbital drift
+      if (aType > 0.4 && aType < 1.6) {
+        float ang = uTime * 0.28 + aPhase * 6.2832;
+        float r = length(pos.xz);
+        pos.x = cos(ang) * r;
+        pos.z = sin(ang) * r;
+      }
+
+      vec4 clip = uViewProj * vec4(pos, 1.0);
+      gl_Position = clip;
+
+      float size = aSize * uIntensity * (1.0 + uPulse * 0.35);
+      size *= (1.0 + shockWave * 0.9);
+      float distCam = length(pos - uCamPos);
+      gl_PointSize = clamp(size * (210.0 / max(distCam, 0.6)), 1.0, 48.0);
+
+      vColor = aColor * (1.0 + uPulse * 0.45 + shockWave * 0.7);
+      vAlpha = clamp(1.15 - distCam * 0.07, 0.12, 1.0);
+    }
+  `;
+
+  const particleFS = `
+    precision mediump float;
+    varying vec3 vColor;
+    varying float vAlpha;
+
+    void main() {
+      vec2 uv = gl_PointCoord - 0.5;
+      float d = length(uv);
+      if (d > 0.5) discard;
+
+      float core = smoothstep(0.5, 0.12, d);
+      float glow = exp(-d * 6.2) * 0.55;
+      float alpha = (core * 0.85 + glow) * vAlpha;
+
+      gl_FragColor = vec4(vColor * alpha, alpha);
+    }
+  `;
+
+  const brightFS = `
+    precision mediump float;
+    uniform sampler2D uTex;
+    uniform float uThreshold;
+    varying vec2 vUv;
+    void main() {
+      vec4 c = texture2D(uTex, vUv);
+      float lum = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
+      float contrib = max(0.0, lum - uThreshold);
+      gl_FragColor = vec4(c.rgb * contrib * 1.35, 1.0);
+    }
+  `;
+
+  const blurFS = `
+    precision mediump float;
+    uniform sampler2D uTex;
+    uniform vec2 uDir;
+    uniform vec2 uRes;
+    varying vec2 vUv;
+    void main() {
+      vec2 texel = 1.0 / uRes;
+      vec4 sum = texture2D(uTex, vUv) * 0.227027;
+      sum += texture2D(uTex, vUv + uDir * texel * 1.384615) * 0.316216;
+      sum += texture2D(uTex, vUv - uDir * texel * 1.384615) * 0.316216;
+      sum += texture2D(uTex, vUv + uDir * texel * 3.230769) * 0.070270;
+      sum += texture2D(uTex, vUv - uDir * texel * 3.230769) * 0.070270;
+      gl_FragColor = sum;
+    }
+  `;
+
+  const compositeFS = `
+    precision mediump float;
+    uniform sampler2D uScene;
+    uniform sampler2D uBloom;
+    uniform sampler2D uTrail;
+    uniform float uTime;
+    uniform float uIntensity;
+    uniform vec2 uRes;
+    uniform float uTrails;
+    varying vec2 vUv;
+
+    float hash(vec2 p) {
+      return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+    }
+
+    void main() {
+      vec2 uv = vUv;
+      vec2 nuv = uv * 2.0 - 1.0;
+      nuv.x *= uRes.x / uRes.y;
+
+      // dark clean background
+      float r = length(nuv);
+      vec3 bg = vec3(0.015, 0.025, 0.055) * (1.0 - r * 0.35);
+
+      // sparse stars
+      float stars = step(0.997, hash(floor(uv * uRes * 0.35)));
+      bg += stars * 0.45 * vec3(0.6, 0.75, 1.0);
+
+      vec4 scene = texture2D(uScene, uv);
+      vec4 bloom = texture2D(uBloom, uv);
+      vec4 trail = texture2D(uTrail, uv);
+
+      vec3 col = bg;
+      col += scene.rgb;
+      col += bloom.rgb * 0.95 * uIntensity;
+      col += trail.rgb * 0.38 * uTrails;
+
+      // gentle tone map
+      col = col / (1.0 + col * 0.55);
+      col = pow(col, vec3(0.92));
+
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `;
+
+  const fullscreenVS = `
+    attribute vec2 aPos;
+    varying vec2 vUv;
+    void main() {
+      vUv = aPos * 0.5 + 0.5;
+      gl_Position = vec4(aPos, 0.0, 1.0);
+    }
+  `;
+
+  const trailFS = `
+    precision mediump float;
+    uniform sampler2D uPrev;
+    uniform sampler2D uScene;
+    uniform float uFade;
+    varying vec2 vUv;
+    void main() {
+      vec4 prev = texture2D(uPrev, vUv);
+      vec4 curr = texture2D(uScene, vUv);
+      float lum = dot(curr.rgb, vec3(0.3, 0.5, 0.2));
+      vec3 add = curr.rgb * smoothstep(0.12, 0.45, lum) * 0.55;
+      vec3 col = prev.rgb * uFade + add;
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `;
+
+  const particleProg = createProgram(particleVS, particleFS);
+  const particleU = getUniforms(particleProg, [
+    'uViewProj', 'uTime', 'uPulse', 'uShock', 'uIntensity', 'uCamPos'
+  ]);
+
+  const brightProg = createProgram(fullscreenVS, brightFS);
+  const brightU = getUniforms(brightProg, ['uTex', 'uThreshold']);
+
+  const blurProg = createProgram(fullscreenVS, blurFS);
+  const blurU = getUniforms(blurProg, ['uTex', 'uDir', 'uRes']);
+
+  const compositeProg = createProgram(fullscreenVS, compositeFS);
+  const compositeU = getUniforms(compositeProg, [
+    'uScene', 'uBloom', 'uTrail', 'uTime', 'uIntensity', 'uRes', 'uTrails'
+  ]);
+
+  const trailProg = createProgram(fullscreenVS, trailFS);
+  const trailU = getUniforms(trailProg, ['uPrev', 'uScene', 'uFade']);
+
+  // ---------- Particles (balanced count) ----------
+  const PARTICLE_COUNT = 2800;
+  const positions = new Float32Array(PARTICLE_COUNT * 3);
+  const sizes = new Float32Array(PARTICLE_COUNT);
+  const colors = new Float32Array(PARTICLE_COUNT * 3);
+  const phases = new Float32Array(PARTICLE_COUNT);
+  const types = new Float32Array(PARTICLE_COUNT);
+
+  // Cleaner palette – less hot gold in the very center
+  const palette = [
+    [0.95, 0.58, 0.18],  // soft gold
+    [0.85, 0.38, 0.08],  // orange
+    [0.25, 0.68, 0.95],  // cyan
+    [0.12, 0.42, 0.9],   // blue
+    [0.7, 0.78, 0.95],   // pale
+    [0.55, 0.82, 1.0]    // light cyan
+  ];
+
+  function initParticles() {
+    let i = 0;
+
+    // Core – smaller, darker, fewer
+    for (; i < 520; i++) {
+      const theta = Math.acos(2 * Math.random() - 1);
+      const phi = Math.random() * TAU;
+      const r = Math.pow(Math.random(), 0.7) * 0.38;
+      positions[i*3]   = r * Math.sin(theta) * Math.cos(phi);
+      positions[i*3+1] = r * Math.sin(theta) * Math.sin(phi);
+      positions[i*3+2] = r * Math.cos(theta);
+      sizes[i] = rand(1.1, 2.4);
+      const c = palette[Math.random() < 0.55 ? 2 : 3]; // more cyan than gold in core
+      colors[i*3]   = c[0] * rand(0.55, 0.85);
+      colors[i*3+1] = c[1] * rand(0.55, 0.85);
+      colors[i*3+2] = c[2] * rand(0.55, 0.85);
+      phases[i] = Math.random();
+      types[i] = 0;
+    }
+
+    // Rings
+    for (let ring = 0; ring < 3; ring++) {
+      const ringR = 0.62 + ring * 0.26;
+      const count = 420;
+      for (let j = 0; j < count; j++, i++) {
+        const a = (j / count) * TAU + ring * 0.35;
+        const wobble = 0.03 * Math.sin(a * 4 + ring);
+        positions[i*3]   = Math.cos(a) * (ringR + wobble);
+        positions[i*3+1] = (Math.random() - 0.5) * 0.09 + Math.sin(a * 2) * 0.04;
+        positions[i*3+2] = Math.sin(a) * (ringR + wobble);
+        sizes[i] = rand(1.6, 3.6);
+        const c = palette[ring === 1 ? 2 : (ring === 2 ? 0 : 1)];
+        colors[i*3]   = c[0] * rand(0.75, 1.0);
+        colors[i*3+1] = c[1] * rand(0.75, 1.0);
+        colors[i*3+2] = c[2] * rand(0.75, 1.0);
+        phases[i] = j / count;
+        types[i] = 1;
+      }
+    }
+
+    // Outer shell
+    for (; i < 2500; i++) {
+      const theta = Math.acos(2 * Math.random() - 1);
+      const phi = Math.random() * TAU;
+      const r = 1.05 + Math.random() * 0.48;
+      positions[i*3]   = r * Math.sin(theta) * Math.cos(phi);
+      positions[i*3+1] = r * Math.sin(theta) * Math.sin(phi);
+      positions[i*3+2] = r * Math.cos(theta);
+      sizes[i] = rand(0.9, 2.2);
+      const c = palette[Math.random() < 0.6 ? 2 : 3];
+      colors[i*3]   = c[0] * rand(0.5, 0.85);
+      colors[i*3+1] = c[1] * rand(0.5, 0.85);
+      colors[i*3+2] = c[2] * rand(0.5, 0.85);
+      phases[i] = Math.random();
+      types[i] = 2;
+    }
+
+    // Sparse sparks
+    for (; i < PARTICLE_COUNT; i++) {
+      const theta = Math.random() * Math.PI;
+      const phi = Math.random() * TAU;
+      const r = 0.4 + Math.random() * 1.35;
+      positions[i*3]   = r * Math.sin(theta) * Math.cos(phi);
+      positions[i*3+1] = r * Math.sin(theta) * Math.sin(phi);
+      positions[i*3+2] = r * Math.cos(theta);
+      sizes[i] = rand(2.2, 4.5);
+      const c = palette[Math.random() < 0.5 ? 4 : 5];
+      colors[i*3] = c[0] * 0.9;
+      colors[i*3+1] = c[1] * 0.9;
+      colors[i*3+2] = c[2] * 0.9;
+      phases[i] = Math.random();
+      types[i] = 3;
+    }
+  }
+  initParticles();
+
+  const posBuf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
+
+  const sizeBuf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, sizeBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, sizes, gl.STATIC_DRAW);
+
+  const colorBuf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, colorBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, colors, gl.STATIC_DRAW);
+
+  const phaseBuf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, phaseBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, phases, gl.STATIC_DRAW);
+
+  const typeBuf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, typeBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, types, gl.STATIC_DRAW);
+
+  const aPos = gl.getAttribLocation(particleProg, 'aPos');
+  const aSize = gl.getAttribLocation(particleProg, 'aSize');
+  const aColor = gl.getAttribLocation(particleProg, 'aColor');
+  const aPhase = gl.getAttribLocation(particleProg, 'aPhase');
+  const aType = gl.getAttribLocation(particleProg, 'aType');
+
+  // ---------- Camera ----------
+  let rotY = 0.35;
+  let rotX = 0.22;
+  let targetRotY = rotY;
+  let targetRotX = rotX;
+  let velY = 0;
+  let velX = 0;
+  let zoom = 4.6;
+  let targetZoom = zoom;
+  let isDragging = false;
+  let lastX = 0, lastY = 0;
+  let pulse = 0;
+  let shock = 0;
+  let shockActive = false;
+  let trailsEnabled = true;
+  let intensity = 0.85;
+  let autoRotate = true;
+  let lastTime = performance.now();
+  let frameCount = 0;
+  let fpsTime = 0;
+  let fps = 60;
+
+  function perspective(fov, aspect, near, far) {
+    const f = 1 / Math.tan(fov / 2);
+    const nf = 1 / (near - far);
+    return new Float32Array([
+      f / aspect, 0, 0, 0,
+      0, f, 0, 0,
+      0, 0, (far + near) * nf, -1,
+      0, 0, 2 * far * near * nf, 0
+    ]);
+  }
+
+  function lookAt(eye, target, up) {
+    const z = [eye[0]-target[0], eye[1]-target[1], eye[2]-target[2]];
+    let len = Math.hypot(z[0], z[1], z[2]) || 1;
+    z[0]/=len; z[1]/=len; z[2]/=len;
+    const x = [up[1]*z[2]-up[2]*z[1], up[2]*z[0]-up[0]*z[2], up[0]*z[1]-up[1]*z[0]];
+    len = Math.hypot(x[0], x[1], x[2]) || 1;
+    x[0]/=len; x[1]/=len; x[2]/=len;
+    const y = [z[1]*x[2]-z[2]*x[1], z[2]*x[0]-z[0]*x[2], z[0]*x[1]-z[1]*x[0]];
+    return new Float32Array([
+      x[0], y[0], z[0], 0,
+      x[1], y[1], z[1], 0,
+      x[2], y[2], z[2], 0,
+      -(x[0]*eye[0]+x[1]*eye[1]+x[2]*eye[2]),
+      -(y[0]*eye[0]+y[1]*eye[1]+y[2]*eye[2]),
+      -(z[0]*eye[0]+z[1]*eye[1]+z[2]*eye[2]), 1
+    ]);
+  }
+
+  function mulMat(a, b) {
+    const o = new Float32Array(16);
+    for (let i = 0; i < 4; i++)
+      for (let j = 0; j < 4; j++)
+        o[i*4+j] = a[j]*b[i*4] + a[4+j]*b[i*4+1] + a[8+j]*b[i*4+2] + a[12+j]*b[i*4+3];
+    return o;
+  }
+
+  function onPointerDown(e) {
+    isDragging = true;
+    autoRotate = false;
+    lastX = e.clientX || (e.touches && e.touches[0].clientX);
+    lastY = e.clientY || (e.touches && e.touches[0].clientY);
+    if (canvas.setPointerCapture) canvas.setPointerCapture(e.pointerId);
+  }
+  function onPointerMove(e) {
+    if (!isDragging) return;
+    const x = e.clientX || (e.touches && e.touches[0].clientX);
+    const y = e.clientY || (e.touches && e.touches[0].clientY);
+    const dx = x - lastX;
+    const dy = y - lastY;
+    velY = dx * 0.0045;
+    velX = dy * 0.0038;
+    targetRotY += velY;
+    targetRotX = clamp(targetRotX + velX, -1.15, 1.15);
+    lastX = x; lastY = y;
+  }
+  function onPointerUp() { isDragging = false; }
+  function onWheel(e) {
+    e.preventDefault();
+    targetZoom = clamp(targetZoom + e.deltaY * 0.0022, 2.6, 7.5);
+  }
+  function onClick() {
+    if (Math.abs(velY) + Math.abs(velX) < 0.0015) triggerPulse();
+  }
+
+  canvas.addEventListener('pointerdown', onPointerDown);
+  canvas.addEventListener('pointermove', onPointerMove);
+  canvas.addEventListener('pointerup', onPointerUp);
+  canvas.addEventListener('pointercancel', onPointerUp);
+  canvas.addEventListener('wheel', onWheel, { passive: false });
+  canvas.addEventListener('click', onClick);
+
+  $('btn-pulse').addEventListener('click', () => triggerPulse());
+  $('btn-shock').addEventListener('click', () => triggerShock());
+  $('btn-trails').addEventListener('click', function () {
+    trailsEnabled = !trailsEnabled;
+    this.classList.toggle('active', trailsEnabled);
+  });
+  $('strength').addEventListener('input', e => intensity = parseFloat(e.target.value));
+
+  function triggerPulse() { pulse = 1.0; }
+  function triggerShock() {
+    shock = 0.01;
+    shockActive = true;
+  }
+
+  // ---------- Render ----------
+  function render(now) {
+    const dt = Math.min((now - lastTime) / 1000, 0.05);
+    lastTime = now;
+    frameCount++;
+    fpsTime += dt;
+    if (fpsTime > 0.6) {
+      fps = Math.round(frameCount / fpsTime);
+      frameCount = 0;
+      fpsTime = 0;
+      $('status').textContent = fps + ' FPS';
+    }
+
+    if (!isDragging) {
+      velY *= 0.93;
+      velX *= 0.93;
+      targetRotY += velY;
+      targetRotX = clamp(targetRotX + velX, -1.15, 1.15);
+      if (autoRotate) targetRotY += dt * 0.15;
+    }
+    rotY = lerp(rotY, targetRotY, 1 - Math.pow(0.008, dt));
+    rotX = lerp(rotX, targetRotX, 1 - Math.pow(0.008, dt));
+    zoom = lerp(zoom, targetZoom, 1 - Math.pow(0.018, dt));
+
+    pulse = Math.max(0, pulse - dt * 1.9);
+    if (shockActive) {
+      shock += dt * 1.55;
+      if (shock > 2.0) { shock = 0; shockActive = false; }
+    }
+
+    const camDist = zoom;
+    const eye = [
+      Math.sin(rotY) * Math.cos(rotX) * camDist,
+      Math.sin(rotX) * camDist * 0.85,
+      Math.cos(rotY) * Math.cos(rotX) * camDist
+    ];
+    const view = lookAt(eye, [0,0,0], [0,1,0]);
+    const proj = perspective(0.82, canvas.width / canvas.height, 0.15, 35);
+    const viewProj = mulMat(proj, view);
+
+    // Particles → scene
+    gl.bindFramebuffer(gl.FRAMEBUFFER, sceneFBO.fbo);
+    gl.viewport(0, 0, sceneFBO.w, sceneFBO.h);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, gl.ONE);
+    gl.useProgram(particleProg);
+
+    gl.uniformMatrix4fv(particleU.uViewProj, false, viewProj);
+    gl.uniform1f(particleU.uTime, now * 0.001);
+    gl.uniform1f(particleU.uPulse, pulse);
+    gl.uniform1f(particleU.uShock, shock);
+    gl.uniform1f(particleU.uIntensity, intensity);
+    gl.uniform3fv(particleU.uCamPos, eye);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
+    gl.enableVertexAttribArray(aPos);
+    gl.vertexAttribPointer(aPos, 3, gl.FLOAT, false, 0, 0);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, sizeBuf);
+    gl.enableVertexAttribArray(aSize);
+    gl.vertexAttribPointer(aSize, 1, gl.FLOAT, false, 0, 0);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuf);
+    gl.enableVertexAttribArray(aColor);
+    gl.vertexAttribPointer(aColor, 3, gl.FLOAT, false, 0, 0);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, phaseBuf);
+    gl.enableVertexAttribArray(aPhase);
+    gl.vertexAttribPointer(aPhase, 1, gl.FLOAT, false, 0, 0);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, typeBuf);
+    gl.enableVertexAttribArray(aType);
+    gl.vertexAttribPointer(aType, 1, gl.FLOAT, false, 0, 0);
+
+    gl.drawArrays(gl.POINTS, 0, PARTICLE_COUNT);
+    gl.disable(gl.BLEND);
+
+    // Trails
+    const prevTrail = trailSrc === 0 ? trailFBO1 : trailFBO2;
+    const nextTrail = trailSrc === 0 ? trailFBO2 : trailFBO1;
+    if (trailsEnabled) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, nextTrail.fbo);
+      gl.viewport(0, 0, nextTrail.w, nextTrail.h);
+      gl.useProgram(trailProg);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, prevTrail.tex);
+      gl.uniform1i(trailU.uPrev, 0);
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, sceneFBO.tex);
+      gl.uniform1i(trailU.uScene, 1);
+      gl.uniform1f(trailU.uFade, 0.86);
+      gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
+      gl.enableVertexAttribArray(0);
+      gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+      trailSrc = 1 - trailSrc;
+    } else {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, nextTrail.fbo);
+      gl.clearColor(0,0,0,0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      trailSrc = 1 - trailSrc;
+    }
+    const currentTrailTex = (trailSrc === 0 ? trailFBO1 : trailFBO2).tex;
+
+    // Bright pass
+    gl.bindFramebuffer(gl.FRAMEBUFFER, brightFBO.fbo);
+    gl.viewport(0, 0, brightFBO.w, brightFBO.h);
+    gl.useProgram(brightProg);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, sceneFBO.tex);
+    gl.uniform1i(brightU.uTex, 0);
+    gl.uniform1f(brightU.uThreshold, 0.28);
+    gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+    // Blur (2 passes only – lighter)
+    function doBlur(srcTex, dstFBO, dirX, dirY) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, dstFBO.fbo);
+      gl.viewport(0, 0, dstFBO.w, dstFBO.h);
+      gl.useProgram(blurProg);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, srcTex);
+      gl.uniform1i(blurU.uTex, 0);
+      gl.uniform2f(blurU.uDir, dirX, dirY);
+      gl.uniform2f(blurU.uRes, bloomW, bloomH);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+    }
+    doBlur(brightFBO.tex, blurFBO1, 1.0, 0);
+    doBlur(blurFBO1.tex, blurFBO2, 0, 1.0);
+
+    // Composite
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.useProgram(compositeProg);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, sceneFBO.tex);
+    gl.uniform1i(compositeU.uScene, 0);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, blurFBO2.tex);
+    gl.uniform1i(compositeU.uBloom, 1);
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, currentTrailTex);
+    gl.uniform1i(compositeU.uTrail, 2);
+    gl.uniform1f(compositeU.uTime, now * 0.001);
+    gl.uniform1f(compositeU.uIntensity, intensity);
+    gl.uniform2f(compositeU.uRes, canvas.width, canvas.height);
+    gl.uniform1f(compositeU.uTrails, trailsEnabled ? 1.0 : 0.0);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+    requestAnimationFrame(render);
+  }
+
+  startExperience = function () {
+    setTimeout(() => triggerPulse(), 350);
+    requestAnimationFrame(render);
+  };
+
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+})();
+</script>
+</body>
+</html>
